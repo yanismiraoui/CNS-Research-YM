@@ -1,0 +1,13 @@
+BrainGB/
+Data/
+.DS_Store
+data_abide/
+data_abide_aal/
+data_favour/
+data_sherlock/
+datasets/
+misc_data/
+PPMI_small_xGW-GAT/
+utils/
+xGW-GAT/
+
