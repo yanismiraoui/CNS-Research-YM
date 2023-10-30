@@ -1,5 +1,0 @@
-.venv/
-datasets/
-outputs/
-model_checkpoints/
-*__pycache__/

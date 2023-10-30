@@ -1,0 +1,3 @@
+['main.py', '--dataset=PRIVATE', '--model_name=gcn', '--sample_selection', '--enable_nni']
+(K Fold Final Result)| avg_acc=66.67 +-  16.67, avg_auc=50.00 +- 0.00
+
