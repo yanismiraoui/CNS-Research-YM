@@ -76,10 +76,10 @@ def process_pair(data, i, j, method, args):
         if method == "tan":
             dist = dist[np.triu_indices_from(dist)]
         elif method == "node":
-            dist = nx.convert_matrix.from_numpy_matrix(np.abs(dist))
+            dist = nx.convert_matrix.from_numpy_array(np.abs(dist))
             dist = np.array(list(dict(dist.degree(weight="weight")).values()))
         elif method == "eigen":
-            dist = nx.convert_matrix.from_numpy_matrix(np.abs(dist))
+            dist = nx.convert_matrix.from_numpy_array(np.abs(dist))
             dist = np.array(
                 list(
                     dict(
@@ -88,7 +88,7 @@ def process_pair(data, i, j, method, args):
                 )
             )
         elif method == "close":
-            dist = nx.convert_matrix.from_numpy_matrix(np.abs(dist))
+            dist = nx.convert_matrix.from_numpy_array(np.abs(dist))
             dist = np.array(
                 list(
                     dict(
@@ -97,7 +97,7 @@ def process_pair(data, i, j, method, args):
                 )
             )
         elif method in ("concat_orig", "concat_scale"):
-            dist = nx.convert_matrix.from_numpy_matrix(np.abs(dist))
+            dist = nx.convert_matrix.from_numpy_array(np.abs(dist))
             dist_a = np.array(list(dict(dist.degree(weight="weight")).values()))
             dist_b = np.array(
                 list(
@@ -228,7 +228,7 @@ def get_graph(mat):
     :return: edge_index: (2, num_edges)
              edge_weight:(num_edges, 1)
     """
-    G = nx.from_numpy_matrix(mat.numpy(), create_using=nx.Graph)
+    G = nx.from_numpy_array(mat.numpy(), create_using=nx.Graph)
     edge_index = torch.tensor(list(G.edges))
     # print(edge_index.shape)
     edge_attribute = []
