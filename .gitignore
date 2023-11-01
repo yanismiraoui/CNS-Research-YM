@@ -9,9 +9,13 @@ data_sherlock/
 datasets/
 misc_data/
 PPMI_small_xGW-GAT/
-utils/
 xGW-GAT/
+u/
 xGW-GAT_ppmi/
 xGW-GAT_ppmi copy/
 personal_access.txt
+*.pyc
+*.ipynb_checkpoints/
+sherlock_interactive.txt
+
 
