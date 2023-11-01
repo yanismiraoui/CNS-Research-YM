@@ -1,7 +1,7 @@
 import networkx as nx
 import numpy as np
 import torch
-from networkx.convert_matrix import from_numpy_array
+from networkx.convert_matrix import from_numpy_matrix
 from node2vec import Node2Vec as Node2Vec_
 from numpy import linalg as LA
 from torch_geometric.data import Data
@@ -201,7 +201,7 @@ class Node2Vec(BaseTransform):
         xs = []
         for adj in adjs:
             x = torch.zeros((data.num_nodes, self.feature_dim))
-            graph = from_numpy_array(adj.numpy())
+            graph = from_numpy_matrix(adj.numpy())
             node2vec = Node2Vec_(
                 graph,
                 dimensions=self.feature_dim,
