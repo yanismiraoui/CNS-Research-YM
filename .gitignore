@@ -17,5 +17,4 @@ personal_access.txt
 *.pyc
 *.ipynb_checkpoints/
 sherlock_interactive.txt
-
-
+RAW_PPMI/
