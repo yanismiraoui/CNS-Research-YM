@@ -2,6 +2,7 @@
 #SBATCH --job-name=preprocess_abide
 #SBATCH --time=72:00:00
 #SBATCH -c 4
+#SBATCH -p normal
 #SBATCH --mem=8GB
 #SBATCH --mail-user=ymiraoui@stanford.edu
 #SBATCH --mail-type=ALL
