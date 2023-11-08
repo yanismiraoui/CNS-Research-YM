@@ -1,7 +1,7 @@
 BrainGB/
 Data/
 .DS_Store
-data_abide/
+data_abide_cc200/
 data_abide_aal/
 data_abide_ho/
 data_favour/
@@ -18,3 +18,6 @@ personal_access.txt
 *.ipynb_checkpoints/
 sherlock_interactive.txt
 RAW_PPMI/
+processed/
+nifti_series/
+nilearn_cache/
