@@ -10,5 +10,5 @@ ml python/3.9
 ml load py-pytorch/2.0.0_py39
 cd $SCRATCH
 source pre_venv/bin/activate
-cd CNS-Research-YM/xGW-GAT_forked/
+cd CNS-Research-YM/xGW-GAT_forked_ABIDE_ho/
 python3 main.py --dataset="PRIVATE" --model_name=gatv2 --sample_selection
