@@ -1,3 +1,0 @@
-['main.py', '--enable_nni']
-(K Fold Final Result)| avg_acc=60.42 +-  2.08, avg_auc=50.00 +- 0.00
-

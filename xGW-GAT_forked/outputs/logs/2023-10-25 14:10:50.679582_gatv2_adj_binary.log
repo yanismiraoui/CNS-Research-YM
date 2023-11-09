@@ -1,3 +1,0 @@
-['main.py', '--dataset=PRIVATE', '--model_name=gatv2', '--enable_nni']
-(K Fold Final Result)| avg_acc=50.00 +-  0.00, avg_auc=53.33 +- 0.00
-
