@@ -17,6 +17,8 @@ def get_nifti_files(path):
     return nifti_files
 
 nifti_files = get_nifti_files(DATA_DIR)
+# Sample only 10% of the files for testing purposes
+nifti_files = nifti_files[:int(len(nifti_files)/10)]
 
 
 shape_saver = {}
