@@ -74,7 +74,7 @@ def atlas_converter(nifti_files, atlas_name="harvard_oxford", save_summary=True)
 
             # Save the shapes
             shape_saver[nifti_path_dcm2niix] = [cortical_shape, subcortical_shape, concat_shape, correlation_matrix_shape]
-
+            print(shape_saver[nifti_path_dcm2niix])
         except Exception as e:
             shape_saver[nifti_path_dcm2niix] = [None, None, None, None]
             errors += 1
@@ -95,7 +95,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     if len(args) == 1:
         DATA_DIR = args[0]
-        nifti_files = get_nifti_files(DATA_DIR)
+        nifti_files = get_nifti_files(DATA_DIR, fraction=0.3)
         print("Found ", len(nifti_files), " files.")
         atlas_converter(nifti_files)
     elif len(args) < 1:
