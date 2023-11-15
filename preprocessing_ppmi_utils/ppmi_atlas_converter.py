@@ -17,7 +17,7 @@ def get_nifti_files(path, fraction=1.0):
                 nifti_files.append(os.path.join(root, file))
 
     # Sample only fraction of the files for testing purposes
-    nifti_files = nifti_files[:int(len(nifti_files)/fraction)]
+    nifti_files = nifti_files[:int(len(nifti_files)*fraction)]
     return nifti_files
 
 def atlas_converter(nifti_files, atlas_name="harvard_oxford", save_summary=True):
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     elif len(args) < 1:
         DATA_DIR = '../PPMI'
         print("No data directory provided. Using default directory: ", DATA_DIR)
-        nifti_files = get_nifti_files(DATA_DIR)
+        nifti_files = get_nifti_files(DATA_DIR, fraction=0.3)
         print("Found ", len(nifti_files), " files.")
         atlas_converter(nifti_files)
     else:
