@@ -1,6 +1,6 @@
 import os
 
-DATA_DIR = '../RAW_PPMI'
+DATA_DIR = '../PPMI'
 
 subject_folders = [f for f in os.listdir(DATA_DIR) if not f.startswith('.')]
 for subject in subject_folders:
