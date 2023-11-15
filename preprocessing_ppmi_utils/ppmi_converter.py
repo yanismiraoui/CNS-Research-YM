@@ -13,10 +13,10 @@ def ppmi_to_nifti(DATA_DIR):
             for scan_date in scantype_subfolders:
                 scan_path = os.path.join(DATA_DIR, subject, scan_type, scan_date)
                 if len([f for f in os.listdir(scan_path) if f.endswith('.nii')]) > 0:
-                    print("SKIPPING SCAN (NIFTI ALREADY EXISTS): ", scan_path)
+                    # print("SKIPPING SCAN (NIFTI ALREADY EXISTS): ", scan_path)
                     continue
                 if os.path.isdir(scan_path):
-                    print("CONVERTING SCAN: ", scan_path)
+                    # print("CONVERTING SCAN: ", scan_path)
                     dcm2niix_command = "dcm2niix -f %p_%s -g y " + str(scan_path)
                     os.system(dcm2niix_command)
 
