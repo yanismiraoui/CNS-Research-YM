@@ -21,3 +21,4 @@ RAW_PPMI/
 processed/
 nifti_series/
 nilearn_cache/
+tmp_dcm2bids/
