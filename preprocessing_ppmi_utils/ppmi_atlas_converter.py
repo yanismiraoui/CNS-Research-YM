@@ -35,7 +35,7 @@ def atlas_converter(nifti_files, atlas_name="harvard_oxford", save_summary=True)
                 standardize="zscore_sample",
                 standardize_confounds="zscore_sample",
                 memory="nilearn_cache",
-                verbose=5,
+                verbose=0,
                 labels=labels,
                 resampling_target="labels",
             )
@@ -53,7 +53,7 @@ def atlas_converter(nifti_files, atlas_name="harvard_oxford", save_summary=True)
                 standardize="zscore_sample",
                 standardize_confounds="zscore_sample",
                 memory="nilearn_cache",
-                verbose=5,
+                verbose=0,
                 labels=labels_sub,
             )
 
@@ -96,11 +96,13 @@ if __name__ == "__main__":
     if len(args) == 1:
         DATA_DIR = args[0]
         nifti_files = get_nifti_files(DATA_DIR)
+        print("Found ", len(nifti_files), " files.")
         atlas_converter(nifti_files)
     elif len(args) < 1:
         DATA_DIR = '../PPMI'
         print("No data directory provided. Using default directory: ", DATA_DIR)
         nifti_files = get_nifti_files(DATA_DIR)
+        print("Found ", len(nifti_files), " files.")
         atlas_converter(nifti_files)
     else:
         print("Too many arguments provided.")
