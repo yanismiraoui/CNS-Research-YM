@@ -5,7 +5,7 @@ import os
 from nilearn import datasets
 from nilearn.maskers import NiftiLabelsMasker
 
-DATA_DIR = '../RAW_PPMI'
+DATA_DIR = '../PPMI'
 
 # get all the .nii in a folder and its subfolders
 def get_nifti_files(path):
@@ -23,47 +23,50 @@ nifti_files = nifti_files[:int(len(nifti_files)/10)]
 
 shape_saver = {}
 for nifti_path_dcm2niix in nifti_files:
-    ## CORTICAL ##
-    dataset = datasets.fetch_atlas_harvard_oxford("cort-maxprob-thr25-2mm", symmetric_split=True)
-    atlas_filename = dataset.maps
-    labels = dataset.labels
+    try:
+        ## CORTICAL ##
+        dataset = datasets.fetch_atlas_harvard_oxford("cort-maxprob-thr25-2mm", symmetric_split=True)
+        atlas_filename = dataset.maps
+        labels = dataset.labels
 
-    masker = NiftiLabelsMasker(
-        labels_img=atlas_filename,
-        standardize="zscore_sample",
-        standardize_confounds="zscore_sample",
-        memory="nilearn_cache",
-        verbose=5,
-        labels=labels,
-        resampling_target="data",
-    )
+        masker = NiftiLabelsMasker(
+            labels_img=atlas_filename,
+            standardize="zscore_sample",
+            standardize_confounds="zscore_sample",
+            memory="nilearn_cache",
+            verbose=5,
+            labels=labels,
+            resampling_target="data",
+        )
 
-    time_series = masker.fit_transform(nifti_path_dcm2niix)
-    cortical_shape = time_series.shape
+        time_series = masker.fit_transform(nifti_path_dcm2niix)
+        cortical_shape = time_series.shape
 
-    ## SUBCORTICAL ##
-    dataset_sub = datasets.fetch_atlas_harvard_oxford("sub-maxprob-thr25-2mm", symmetric_split=False)
-    atlas_filename_sub = dataset_sub.maps
-    labels_sub = dataset_sub.labels
+        ## SUBCORTICAL ##
+        dataset_sub = datasets.fetch_atlas_harvard_oxford("sub-maxprob-thr25-2mm", symmetric_split=False)
+        atlas_filename_sub = dataset_sub.maps
+        labels_sub = dataset_sub.labels
 
-    masker_sub = NiftiLabelsMasker(
-        labels_img=atlas_filename_sub,
-        standardize="zscore_sample",
-        standardize_confounds="zscore_sample",
-        memory="nilearn_cache",
-        verbose=5,
-        labels=labels_sub,
-    )
+        masker_sub = NiftiLabelsMasker(
+            labels_img=atlas_filename_sub,
+            standardize="zscore_sample",
+            standardize_confounds="zscore_sample",
+            memory="nilearn_cache",
+            verbose=5,
+            labels=labels_sub,
+        )
 
-    time_series_sub = masker_sub.fit_transform(nifti_path_dcm2niix)
-    subcortical_shape = time_series_sub.shape
+        time_series_sub = masker_sub.fit_transform(nifti_path_dcm2niix)
+        subcortical_shape = time_series_sub.shape
 
-    # Concatenate the two time series together
-    time_series_concat = np.concatenate((time_series, time_series_sub), axis=1)
-    concat_shape = time_series_concat.shape
-
-    # Save the shapes
-    shape_saver[nifti_path_dcm2niix] = [cortical_shape, subcortical_shape, concat_shape]
+        # Concatenate the two time series together
+        time_series_concat = np.concatenate((time_series, time_series_sub), axis=1)
+        concat_shape = time_series_concat.shape
+        # Save the shapes
+        shape_saver[nifti_path_dcm2niix] = [cortical_shape, subcortical_shape, concat_shape]
+    except Exception as e:
+        shape_saver[nifti_path_dcm2niix] = [None, None, None]
+        print(e)
 
 # Save the shapes to a csv
 shape_saver_df = pd.DataFrame.from_dict(shape_saver, orient='index')
