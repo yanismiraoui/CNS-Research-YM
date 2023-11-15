@@ -83,16 +83,16 @@ def atlas_converter(nifti_files, atlas_name="harvard_oxford", save_summary=True)
             shape_saver[nifti_path_dcm2niix] = [None, None, None, None]
             errors += 1
             print(e)
-
+            
+    # Save the correlation matrices to a csv file
+    corr_matrix_store_df = pd.DataFrame.from_dict(corr_matrix_store, orient='index')
+    corr_matrix_store_df.to_csv('corr_matrix_store.csv')
+    
     # Save the shapes to a csv file
     if save_summary:
         shape_saver_df = pd.DataFrame.from_dict(shape_saver, orient='index')
         shape_saver_df.columns = ['cortical_shape', 'subcortical_shape', 'concat_shape']
         shape_saver_df.to_csv('shape_saver.csv')
-    
-    # Save the correlation matrices to a csv file
-    corr_matrix_store_df = pd.DataFrame.from_dict(corr_matrix_store, orient='index')
-    corr_matrix_store_df.to_csv('corr_matrix_store.csv')
 
     print(" ### SUMMARY ### ")
     print("Successfully converted ", len(nifti_files) - errors, " files.")
