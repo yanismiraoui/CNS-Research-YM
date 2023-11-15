@@ -13,5 +13,5 @@ for subject in subject_folders:
             scan_path = os.path.join(DATA_DIR, subject, scan_type, scan_date)
             if os.path.isdir(scan_path):
                 print("CONVERTING SCAN: ", scan_path)
-                dcm2niix_command = f"dcm2niix -f %p_%s -g y {scan_path}"
+                dcm2niix_command = "dcm2niix -f %p_%s -g y " + str(scan_path)
                 os.system(dcm2niix_command)
