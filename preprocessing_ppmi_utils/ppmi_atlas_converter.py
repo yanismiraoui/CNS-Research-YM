@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 import nilearn
 from nilearn import datasets
 from nilearn.maskers import NiftiLabelsMasker
@@ -22,7 +23,7 @@ def get_nifti_files(path, fraction=1.0):
 def atlas_converter(nifti_files, atlas_name="harvard_oxford", save_summary=True):
     shape_saver = {}
     errors = 0
-    for nifti_path_dcm2niix in nifti_files:
+    for nifti_path_dcm2niix in tqdm(nifti_files):
         try:
             ## CORTICAL ##
             dataset = datasets.fetch_atlas_harvard_oxford("cort-maxprob-thr25-2mm", symmetric_split=True)
