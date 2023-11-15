@@ -23,6 +23,7 @@ def get_nifti_files(path, fraction=1.0):
 def atlas_converter(nifti_files, atlas_name="harvard_oxford", save_summary=True):
     shape_saver = {}
     errors = 0
+    corr_matrix_store = {}
     for nifti_path_dcm2niix in tqdm(nifti_files):
         try:
             ## CORTICAL ##
@@ -75,6 +76,9 @@ def atlas_converter(nifti_files, atlas_name="harvard_oxford", save_summary=True)
             # Save the shapes
             shape_saver[nifti_path_dcm2niix] = [cortical_shape, subcortical_shape, concat_shape, correlation_matrix_shape]
             print(shape_saver[nifti_path_dcm2niix])
+
+            # Save the correlation matrix
+            corr_matrix_store[nifti_path_dcm2niix] = correlation_matrix
         except Exception as e:
             shape_saver[nifti_path_dcm2niix] = [None, None, None, None]
             errors += 1
@@ -85,6 +89,10 @@ def atlas_converter(nifti_files, atlas_name="harvard_oxford", save_summary=True)
         shape_saver_df = pd.DataFrame.from_dict(shape_saver, orient='index')
         shape_saver_df.columns = ['cortical_shape', 'subcortical_shape', 'concat_shape']
         shape_saver_df.to_csv('shape_saver.csv')
+    
+    # Save the correlation matrices to a csv file
+    corr_matrix_store_df = pd.DataFrame.from_dict(corr_matrix_store, orient='index')
+    corr_matrix_store_df.to_csv('corr_matrix_store.csv')
 
     print(" ### SUMMARY ### ")
     print("Successfully converted ", len(nifti_files) - errors, " files.")
