@@ -1,9 +1,10 @@
 import os
 import sys
+import tqdm
 
 def ppmi_to_nifti(DATA_DIR):
     subject_folders = [f for f in os.listdir(DATA_DIR) if not f.startswith('.')]
-    for subject in subject_folders:
+    for subject in tqdm(subject_folders):
         scantype_folders = os.listdir(os.path.join(DATA_DIR, subject))
         for scan_type in scantype_folders:
             if scan_type.startswith('.'):
