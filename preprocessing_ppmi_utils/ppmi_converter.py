@@ -1,6 +1,6 @@
 import os
 import sys
-import tqdm
+from tqdm import tqdm
 
 def ppmi_to_nifti(DATA_DIR):
     subject_folders = [f for f in os.listdir(DATA_DIR) if not f.startswith('.')]
