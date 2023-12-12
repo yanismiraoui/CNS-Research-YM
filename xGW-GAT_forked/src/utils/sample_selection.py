@@ -132,11 +132,13 @@ def select_samples_per_class(
                     ]
                     residuals.append(distance)
                     score_errors.append(score_error)
-
+            
+            # Select third element of tuple
+            #residuals = [x[2] for x in residuals]
+            if isinstance(residuals[0], tuple):
+                residuals = [x[2] for x in residuals]
             if np.array(residuals[0]).shape == ():
                 residuals = np.array(residuals).reshape(-1, 1)
-            elif np.array(residuals[0]).shape == (3,):
-                residuals = [x[2] for x in residuals]
             
             selectionNet = LinearRegression()
             selectionNet.fit(residuals, score_errors)
@@ -148,11 +150,12 @@ def select_samples_per_class(
                         class_samples[holdout_ids[i]], class_samples[train_ids[j]]
                     ]
                     R_tst.append(distance)
-                R_tst = np.stack(R_tst)
+                #print(R_tst)
+                #R_tst = np.stack(R_tst)
+                if isinstance(R_tst[0], tuple):
+                    R_tst = [x[2] for x in R_tst]
                 if np.array(R_tst[0]).shape == ():
                     R_tst = np.array(R_tst).reshape(-1, 1)
-                elif np.array(R_tst[0]).shape == (3,):
-                    R_tst = [x[2] for x in R_tst]
                 error_pred = selectionNet.predict(R_tst).ravel()
 
                 for k in k_list:
