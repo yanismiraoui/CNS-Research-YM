@@ -24,3 +24,5 @@ nifti_series/
 nilearn_cache/
 tmp_dcm2bids/
 comparison_data/
+learning-from-brains-master
+*.pptx
