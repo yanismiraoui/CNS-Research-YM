@@ -11,4 +11,4 @@ ml load py-pytorch/2.0.0_py39
 cd $SCRATCH
 source pre_venv/bin/activate
 cd CNS-Research-YM/
-python3 preprocess_abide.py --batch=0
+python3 preprocess_abide.py --directory=/abide/func_preproc/ --batch_number=1
