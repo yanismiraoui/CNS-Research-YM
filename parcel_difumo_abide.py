@@ -30,27 +30,25 @@ def process_batch(batch_files, directory):
                     resolution_mm=2
                 )
     atlas_maps = dataset.maps
-   
-    masker = NiftiMapsMasker(
-    maps_img=atlas_maps,
-    smoothing_fwhm=3,
-    standardize="zscore",
-    detrend=True,
-    memory="nilearn_cache",
-    verbose=5,
-    high_pass=0.008,
-    t_r=t_r,
-    )
-
-    correlation_measure = ConnectivityMeasure(
-    kind="correlation",
-    standardize="zscore_sample",
-    )
 
     for nifti_path in tqdm(batch_files):
         full_path = os.path.join(directory, nifti_path)
         t_r = get_bold_tr(full_path)
+        masker = NiftiMapsMasker(
+                maps_img=atlas_maps,
+                smoothing_fwhm=3,
+                standardize="zscore",
+                detrend=True,
+                memory="nilearn_cache",
+                verbose=5,
+                high_pass=0.008,
+                t_r=t_r,
+                )
         time_series = masker.fit_transform(full_path)
+        correlation_measure = ConnectivityMeasure(
+                kind="correlation",
+                standardize="zscore_sample",
+                )
         correlation_matrix = correlation_measure.fit_transform([time_series])[0]
         store_matrix[full_path] = correlation_matrix
     return store_matrix

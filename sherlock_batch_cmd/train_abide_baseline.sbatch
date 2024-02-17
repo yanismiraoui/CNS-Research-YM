@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=parcel_difumo_abide
+#SBATCH --job-name=preprocess_abide
 #SBATCH --time=48:00:00
 #SBATCH -c 4
 #SBATCH -p normal
@@ -9,5 +9,6 @@
 ml python/3.9
 ml load py-pytorch/2.0.0_py39
 cd $SCRATCH
-cd CNS-Research-YM/
-python3 parcel_difumo_abide.py ./abide/func_preproc/ 1
+source pre_venv/bin/activate
+cd CNS-Research-YM/xGW-GAT_forked_ABIDE_1024_baseline/
+python3 main.py --dataset="PRIVATE" --model_name=gatv2 --sample_selection
