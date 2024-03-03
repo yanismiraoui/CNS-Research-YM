@@ -69,13 +69,12 @@ def train_eval(
                 total_loss = classification_loss + 0.01 * torch.norm(model.sparse_model.mask, 1)
                 total_loss.backward()
                 optimizer.step()
-                running_loss += float(total_loss.item())
-                
+                running_loss += float(total_loss.item())         
             else:
                 data = data.to(args.device)
                 optimizer.zero_grad()
                 out = model(data)
-                pred = out.max(dim=1)[1]  # Get predicted labels
+                pred = out.max(dim=0)[1]  # Get predicted labels
                 train_preds.append(pred.detach().cpu().tolist())
                 train_labels.append(data.y.detach().cpu().tolist())
                 total_correct += int((pred == data.y).sum())

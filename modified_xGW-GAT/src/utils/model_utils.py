@@ -3,7 +3,7 @@ import torch
 from src.models.BrainGNN import BrainGNN
 from src.models.GATv2 import GATv2
 from src.models.GCN import GCN
-from src.models.MLP import MLP
+from src.models.MLP import MLP, FC
 from src.models.AE import MaskedAutoencoder, Autoencoder, BaselineMask
 
 def build_model(args, num_features):
@@ -70,6 +70,16 @@ def build_model(args, num_features):
                 n_classes=args.num_classes,
             ),
             args,
+        )
+    elif args.model_name == "fc":
+        print("Using FC model")
+        model = FC(
+            num_features,
+            args.hidden_dim,
+            args.n_MLP_layers,
+            torch.nn.ReLU,
+            n_classes=args.num_classes,
+            sparse_method=args.sparse_method,
         )
     else:
         raise ValueError(f'ERROR: Model name "{args.model_name}" not found!')

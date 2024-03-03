@@ -196,7 +196,10 @@ class GATv2(nn.Module):
         )
 
     def forward(self, data, edge_index, edge_attr, batch):
-        x = data.x
+        if isinstance(data, torch.Tensor):
+            x = data
+        else:
+            x = data.x
         edge_attr = torch.abs(edge_attr)
 
         for i, conv in enumerate(self.convs):

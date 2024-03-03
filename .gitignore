@@ -28,3 +28,8 @@ learning-from-brains-master
 *.pptx
 difumo_results/
 data_abide_difumo/
+*.pkl
+modified_xGW-GAT/datasets
+modified_xGW-GAT/model_checkpoints
+modified_xGW-GAT/outputs
+modified_xGW-GAT/community_networks
