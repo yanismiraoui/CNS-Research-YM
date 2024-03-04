@@ -82,7 +82,7 @@ class xGW_GAT:
             ],
             help="Chooses the topological measure to be used",
         )
-        parser.add_argument("--epochs", type=int, default=10)
+        parser.add_argument("--epochs", type=int, default=20)
         parser.add_argument("--lr", type=float, default=3e-4)
         parser.add_argument("--weight_decay", type=float, default=2e-2)
         parser.add_argument(
@@ -125,8 +125,8 @@ class xGW_GAT:
         parser.add_argument("--k_list", type=list, default=[4])
         parser.add_argument("--n_select_splits", type=int, default=2)
         parser.add_argument("--test_interval", type=int, default=1)
-        parser.add_argument("--train_batch_size", type=int, default=1)
-        parser.add_argument("--test_batch_size", type=int, default=1)
+        parser.add_argument("--train_batch_size", type=int, default=2)
+        parser.add_argument("--test_batch_size", type=int, default=2)
         parser.add_argument("--seed", type=int, default=112078)
         parser.add_argument("--diff", type=float, default=0.2)
         parser.add_argument("--mixup", type=int, default=1, choices=[0, 1])
@@ -254,11 +254,11 @@ class xGW_GAT:
 
         #train_test_dataset = dataset
 
-        MLP_layers_values = [2, 3, 4, 8]
-        GNN_layers_values = ["NA"]
-        num_heads_values = ["NA"]
-        hidden_dim_values = [2, 4, 8, 16, 32, 64, 128, 256]
-        dropout_values = ["NA"]
+        MLP_layers_values = [2, 3]
+        GNN_layers_values = [2, 3]
+        num_heads_values = [2, 4]
+        hidden_dim_values = [2, 4]
+        dropout_values = [0.5]
 
         save_result_tuning = {}
 
@@ -413,7 +413,7 @@ class xGW_GAT:
         
         # save the results
         with open(
-            f"./save_results_tuning_fc.pkl",
+            f"./save_results_tuning_gcn_mae.pkl",
             "wb",
         ) as f:
             pickle.dump(save_result_tuning, f)

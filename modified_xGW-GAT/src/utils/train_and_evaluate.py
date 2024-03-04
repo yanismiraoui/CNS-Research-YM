@@ -51,7 +51,11 @@ def train_eval(
                 mse_loss = nn.MSELoss()
                 reconstruction_loss = mse_loss(decoded, data.x)  # Autoencoder loss
                 classification_loss = criterion(gcn_output, data.y)
-                total_loss = reconstruction_loss + classification_loss + 0.01 * torch.norm(model.sparse_model.mask, 1)
+                if args.model_name == "fc":
+                    mask = model.mask
+                else:
+                    mask = model.sparse_model.mask
+                total_loss = reconstruction_loss + classification_loss + 0.01 * torch.norm(mask, 1)
                 total_loss.backward()
                 optimizer.step()
                 running_loss += float(total_loss.item())
@@ -66,7 +70,11 @@ def train_eval(
                 total_correct += int((pred == data.y).sum())
                 total_samples += data.y.size(0)  # Increment the total number of samples
                 classification_loss = criterion(gcn_output, data.y)
-                total_loss = classification_loss + 0.01 * torch.norm(model.sparse_model.mask, 1)
+                if args.model_name == "fc":
+                    mask = model.mask
+                else:
+                    mask = model.sparse_model.mask
+                total_loss = classification_loss + 0.01 * torch.norm(mask, 1)
                 total_loss.backward()
                 optimizer.step()
                 running_loss += float(total_loss.item())         
@@ -148,12 +156,20 @@ def test(model, loader, args, test_loader=None):
             gcn_output, decoded = model(data)
             pred = gcn_output.max(dim=1)[1]
             reconstruction_loss = mse_loss(decoded, data.x)  # Autoencoder loss
-            classification_loss = nn.NLLLoss()(gcn_output, data.y) + 0.01 * torch.norm(model.sparse_model.mask, 1)
+            if args.model_name == "fc":
+                    mask = model.mask
+            else:
+                mask = model.sparse_model.mask
+            classification_loss = nn.NLLLoss()(gcn_output, data.y) + 0.01 * torch.norm(mask, 1)
             total_loss = reconstruction_loss + classification_loss
         elif args.sparse_method == "baseline_mask":
             gcn_output, masked = model(data)
             pred = gcn_output.max(dim=1)[1]
-            total_loss = nn.NLLLoss()(gcn_output, data.y) + 0.01 * torch.norm(model.sparse_model.mask, 1)
+            if args.model_name == "fc":
+                    mask = model.mask
+            else:
+                mask = model.sparse_model.mask
+            total_loss = nn.NLLLoss()(gcn_output, data.y) + 0.01 * torch.norm(mask, 1)
         else:
             out = model(data)
             pred = out.max(dim=1)[1]
