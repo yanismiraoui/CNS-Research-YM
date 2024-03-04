@@ -118,6 +118,9 @@ class xGW_GAT:
         parser.add_argument("--hidden_dim", type=int, default=2)
         parser.add_argument("--hidden_dim_sparse", type=int, default=16)
         parser.add_argument("--latent_dim_sparse", type=int, default=8)
+        parser.add_argument("--loss_lambda", type=int, default=1)
+        parser.add_argument("--weights_lambda", type=int, default=1)
+        parser.add_argument("--weights_elastic", type=float, default=0.2)
         parser.add_argument("--edge_emb_dim", type=int, default=1)
         parser.add_argument("--bucket_sz", type=float, default=0.05)
         parser.add_argument("--dropout", type=float, default=0.8)
@@ -126,8 +129,8 @@ class xGW_GAT:
         parser.add_argument("--k_list", type=list, default=[4])
         parser.add_argument("--n_select_splits", type=int, default=2)
         parser.add_argument("--test_interval", type=int, default=1)
-        parser.add_argument("--train_batch_size", type=int, default=4)
-        parser.add_argument("--test_batch_size", type=int, default=4)
+        parser.add_argument("--train_batch_size", type=int, default=2)
+        parser.add_argument("--test_batch_size", type=int, default=2)
         parser.add_argument("--seed", type=int, default=112078)
         parser.add_argument("--diff", type=float, default=0.2)
         parser.add_argument("--mixup", type=int, default=1, choices=[0, 1])
@@ -255,11 +258,14 @@ class xGW_GAT:
 
         #train_test_dataset = dataset
 
-        MLP_layers_values = [2, 3]
-        GNN_layers_values = [2, 3]
-        num_heads_values = [2, 4]
-        hidden_dim_values = [2, 4]
+        MLP_layers_values = [2]
+        GNN_layers_values = [2]
+        num_heads_values = [2]
+        hidden_dim_values = [4]
         dropout_values = [0.5]
+        loss_lambda_values = [10]
+        weights_lambda_values = [0.1, 1, 10]
+        weights_elastic_values = [0.2, 0.5, 1]
 
         save_result_tuning = {}
 
@@ -273,148 +279,153 @@ class xGW_GAT:
                         args.hidden_dim = hidden_dim
                         for dropout in dropout_values:
                             args.dropout = dropout
-                            print(f"MLP_layers: {MLP_layers}, GNN_layers: {GNN_layers}, num_heads: {num_heads}, hidden_dim: {hidden_dim}, dropout: {dropout}")
-                            save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout)] = []
-                            fold = -1
-                            for train_idx, test_idx in KFold(
-                                args.k_fold_splits,
-                                shuffle=True,
-                                random_state=args.seed,
-                            ).split(train_test_dataset):
-                                fold += 1
-                                print(f"Cross Validation Fold {fold+1}/{args.k_fold_splits}")
-
-                                if args.sample_selection:
-                                    # Select top-k subjects with highest predictive power for labels
-                                    sample_atlas = select_samples_per_class(
-                                        train_idx,
-                                        args.n_select_splits,
-                                        args.k_list,
-                                        data_dict,
-                                        score_dict,
-                                        y,
+                        for loss_lambda in loss_lambda_values:
+                            args.loss_lambda = loss_lambda
+                            for weights_lambda in weights_lambda_values:
+                                args.weights_lambda = weights_lambda
+                                for weights_elastic in weights_elastic_values:
+                                    print(f"MLP_layers: {MLP_layers}, GNN_layers: {GNN_layers}, num_heads: {num_heads}, hidden_dim: {hidden_dim}, dropout: {dropout}")
+                                    save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout, loss_lambda, weights_lambda)] = []
+                                    fold = -1
+                                    for train_idx, test_idx in KFold(
+                                        args.k_fold_splits,
                                         shuffle=True,
-                                        rs=args.seed,
-                                    )
+                                        random_state=args.seed,
+                                    ).split(train_test_dataset):
+                                        fold += 1
+                                        print(f"Cross Validation Fold {fold+1}/{args.k_fold_splits}")
 
-                                for k in args.k_list:
-                                    if args.sample_selection:
-                                        selected_train_idxs = np.array(
-                                            [
-                                                sample_idx
-                                                for class_samples in sample_atlas.values()
-                                                for sample_indices in class_samples.values()
-                                                for sample_idx in sample_indices
-                                            ]
+                                        if args.sample_selection:
+                                            # Select top-k subjects with highest predictive power for labels
+                                            sample_atlas = select_samples_per_class(
+                                                train_idx,
+                                                args.n_select_splits,
+                                                args.k_list,
+                                                data_dict,
+                                                score_dict,
+                                                y,
+                                                shuffle=True,
+                                                rs=args.seed,
+                                            )
+
+                                        for k in args.k_list:
+                                            if args.sample_selection:
+                                                selected_train_idxs = np.array(
+                                                    [
+                                                        sample_idx
+                                                        for class_samples in sample_atlas.values()
+                                                        for sample_indices in class_samples.values()
+                                                        for sample_idx in sample_indices
+                                                    ]
+                                                )
+                                            else:
+                                                selected_train_idxs = np.array(train_idx)
+                                            print(f"Length selected_train_idxs: {len(selected_train_idxs)}")
+                                            # Apply RandomOverSampler to balance classes
+                                            train_res_idxs, _ = RandomOverSampler().fit_resample(
+                                                selected_train_idxs.reshape(-1, 1),
+                                                [y[i] for i in selected_train_idxs],
+                                            )
+                                            print(f"Length train_res_idxs: {len(train_res_idxs)}")
+
+                                            train_set = [train_test_dataset[i] for i in train_res_idxs.ravel()]
+                                            print("Length train_set: ", len(train_set))
+                                            test_set = [train_test_dataset[i] for i in test_idx]
+                                            print("Length test_set: ", len(test_set))
+                                            train_loader = DataLoader(
+                                                train_set, batch_size=args.train_batch_size, shuffle=True,
+                                            )
+                                            test_loader = DataLoader(
+                                                test_set, batch_size=args.test_batch_size, shuffle=False, drop_last=True
+                                            )
+                                            model = build_model(args, train_test_dataset.num_features)
+                                            model = model.to(args.device)
+                                            optimizer = torch.optim.AdamW(
+                                                model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+                                            )
+                                            scheduler = ReduceLROnPlateau(
+                                                optimizer, mode="min", factor=0.5, patience=5, verbose=True
+                                            )
+
+                                            train_acc, train_auc, train_loss, test_acc, test_auc, test_loss, train_model = train_eval(
+                                                model,
+                                                optimizer,
+                                                scheduler,
+                                                class_weights,
+                                                args,
+                                                train_loader,
+                                                test_loader,
+                                                sparse_method=args.sparse_method,
+                                            )
+
+                                            save_model(
+                                                args.epochs, train_model, optimizer, args
+                                            )  # save trained model
+
+                                            # test the best epoch saved model
+                                            best_model_cp = torch.load(
+                                                f"model_checkpoints/best_model_{args.model_name}_{args.num_classes}.pth"
+                                            )
+                                            model.load_state_dict(best_model_cp["model_state_dict"])
+
+                                            train_accs[fold] = train_acc
+                                            train_aucs[fold] = train_auc
+                                            train_losses[fold] = train_loss
+                                            test_accs[fold] = test_acc
+                                            test_aucs[fold] = test_auc
+                                            test_losses[fold] = test_loss
+
+                                            test_acc, test_auc, _, t_preds, t_labels = test(model, test_loader, args)
+
+                                            preds_all[fold] = t_preds
+                                            labels_all[fold] = t_labels
+
+                                            logging.info(
+                                                f"(Performance Last Epoch) | test_acc={(test_acc * 100):.2f}, "
+                                                + f"test_auc={(test_auc * 100):.2f}"
+                                            )
+
+                                            if args.explain:
+                                                explain(model, test_loader, args)
+
+                                        # Store predictions and targets
+                                        curr_dt = str(datetime.now())
+                                        tag = "multi" if args.num_classes > 2 else "binary"
+                                        saved_results = {}
+                                        saved_results["preds"] = np.array(preds_all, dtype="object")
+                                        saved_results["labels"] = np.array(labels_all, dtype="object")
+                                        np.savez(
+                                            f"./outputs/results/{curr_dt}_{args.model_name}_{args.node_features}_{tag}",
+                                            **saved_results,
                                         )
-                                    else:
-                                        selected_train_idxs = np.array(train_idx)
-                                    print(f"Length selected_train_idxs: {len(selected_train_idxs)}")
-                                    # Apply RandomOverSampler to balance classes
-                                    train_res_idxs, _ = RandomOverSampler().fit_resample(
-                                        selected_train_idxs.reshape(-1, 1),
-                                        [y[i] for i in selected_train_idxs],
+
+                                    # get the max accs and aucs for each fold
+                                    max_test_accs = {k: max(v) for k, v in test_accs.items()}
+                                    max_test_aucs = {k: max(v) for k, v in test_aucs.items()}
+
+                                    result_str = (
+                                        f"(K Fold Final Result)| avg_acc={(np.mean(list(max_test_accs.values())) * 100):.2f} +- {(np.std(list(max_test_accs.values())) * 100):.2f}, "
+                                        f"avg_auc={(np.mean(list(max_test_aucs.values())) * 100):.2f} +- {np.std(list(max_test_aucs.values())) * 100:.2f}, "
+                                        f"max_acc={(np.max(list(max_test_accs.values())) * 100):.2f}, "
+                                        f"max_auc={(np.max(list(max_test_aucs.values())) * 100):.2f}\n"
                                     )
-                                    print(f"Length train_res_idxs: {len(train_res_idxs)}")
+                                    logging.info(result_str)
+                                    save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout, loss_lambda, weights_lambda)].append(result_str)
 
-                                    train_set = [train_test_dataset[i] for i in train_res_idxs.ravel()]
-                                    print("Length train_set: ", len(train_set))
-                                    test_set = [train_test_dataset[i] for i in test_idx]
-                                    print("Length test_set: ", len(test_set))
-                                    train_loader = DataLoader(
-                                        train_set, batch_size=args.train_batch_size, shuffle=True, drop_last=True
-                                    )
-                                    test_loader = DataLoader(
-                                        test_set, batch_size=args.test_batch_size, shuffle=False, drop_last=True
-                                    )
-                                    model = build_model(args, train_test_dataset.num_features)
-                                    model = model.to(args.device)
-                                    optimizer = torch.optim.AdamW(
-                                        model.parameters(), lr=args.lr, weight_decay=args.weight_decay
-                                    )
-                                    scheduler = ReduceLROnPlateau(
-                                        optimizer, mode="min", factor=0.5, patience=5, verbose=True
-                                    )
-
-                                    train_acc, train_auc, train_loss, test_acc, test_auc, test_loss, train_model = train_eval(
-                                        model,
-                                        optimizer,
-                                        scheduler,
-                                        class_weights,
-                                        args,
-                                        train_loader,
-                                        test_loader,
-                                        sparse_method=args.sparse_method,
-                                    )
-
-                                    save_model(
-                                        args.epochs, train_model, optimizer, args
-                                    )  # save trained model
-
-                                    # test the best epoch saved model
-                                    best_model_cp = torch.load(
-                                        f"model_checkpoints/best_model_{args.model_name}_{args.num_classes}.pth"
-                                    )
-                                    model.load_state_dict(best_model_cp["model_state_dict"])
-
-                                    train_accs[fold] = train_acc
-                                    train_aucs[fold] = train_auc
-                                    train_losses[fold] = train_loss
-                                    test_accs[fold] = test_acc
-                                    test_aucs[fold] = test_auc
-                                    test_losses[fold] = test_loss
-
-                                    test_acc, test_auc, _, t_preds, t_labels = test(model, test_loader, args)
-
-                                    preds_all[fold] = t_preds
-                                    labels_all[fold] = t_labels
-
-                                    logging.info(
-                                        f"(Performance Last Epoch) | test_acc={(test_acc * 100):.2f}, "
-                                        + f"test_auc={(test_auc * 100):.2f}"
-                                    )
-
-                                    if args.explain:
-                                        explain(model, test_loader, args)
-
-                                # Store predictions and targets
-                                curr_dt = str(datetime.now())
-                                tag = "multi" if args.num_classes > 2 else "binary"
-                                saved_results = {}
-                                saved_results["preds"] = np.array(preds_all, dtype="object")
-                                saved_results["labels"] = np.array(labels_all, dtype="object")
-                                np.savez(
-                                    f"./outputs/results/{curr_dt}_{args.model_name}_{args.node_features}_{tag}",
-                                    **saved_results,
-                                )
-
-                            # get the max accs and aucs for each fold
-                            max_test_accs = {k: max(v) for k, v in test_accs.items()}
-                            max_test_aucs = {k: max(v) for k, v in test_aucs.items()}
-
-                            result_str = (
-                                f"(K Fold Final Result)| avg_acc={(np.mean(list(max_test_accs.values())) * 100):.2f} +- {(np.std(list(max_test_accs.values())) * 100):.2f}, "
-                                f"avg_auc={(np.mean(list(max_test_aucs.values())) * 100):.2f} +- {np.std(list(max_test_aucs.values())) * 100:.2f}, "
-                                f"max_acc={(np.max(list(max_test_accs.values())) * 100):.2f}, "
-                                f"max_auc={(np.max(list(max_test_aucs.values())) * 100):.2f}\n"
-                            )
-                            logging.info(result_str)
-                            save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout)].append(result_str)
-
-                            print("====================================")
-                            print("Testing for Treatment group:")
-                            test_acc, test_auc, _, _, _ = test(model, test_treatment_loader, args)
-                            print(f"Test acc: {test_acc}, Test auc: {test_auc}")
-                            save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout)].append(f"For Treatment group: (Test acc: {test_acc}, Test auc: {test_auc})")
-                            print("====================================")
-                            print("Testing for Scanner group:")
-                            test_acc, test_auc, _, _, _ = test(model, test_scanner_loader, args)
-                            print(f"Test acc: {test_acc}, Test auc: {test_auc}")
-                            save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout)].append(f"For Scanner group: (Test acc: {test_acc}, Test auc: {test_auc})")
+                                    print("====================================")
+                                    print("Testing for Treatment group:")
+                                    test_acc, test_auc, _, _, _ = test(model, test_treatment_loader, args)
+                                    print(f"Test acc: {test_acc}, Test auc: {test_auc}")
+                                    save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout, loss_lambda, weights_lambda)].append(f"For Treatment group: (Test acc: {test_acc}, Test auc: {test_auc})")
+                                    print("====================================")
+                                    print("Testing for Scanner group:")
+                                    test_acc, test_auc, _, _, _ = test(model, test_scanner_loader, args)
+                                    print(f"Test acc: {test_acc}, Test auc: {test_auc}")
+                                    save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout, loss_lambda, weights_lambda)].append(f"For Scanner group: (Test acc: {test_acc}, Test auc: {test_auc})")
         
         # save the results
         with open(
-            f"./save_results_tuning_gcn_baseline_masking_vae.pkl",
+            f"./save_results_tuning_gcn_baseline_masking_vae_weights_elastic.pkl",
             "wb",
         ) as f:
             pickle.dump(save_result_tuning, f)
