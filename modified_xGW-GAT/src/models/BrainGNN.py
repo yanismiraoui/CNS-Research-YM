@@ -25,8 +25,15 @@ class BrainGNN(torch.nn.Module):
         else:
             x = data.x
         if self.sparse_method == "mae":
-            decoded, masked_encoded, masked = self.sparse_model(x)
+            decoded, masked_flattened, masked = self.sparse_model(x)
             g = self.gnn(decoded, edge_index, edge_attr, batch)
+            if self.pooling == "concat":
+                _, g = self.mlp(g)
+            log_logits = F.log_softmax(g, dim=-1)
+            return log_logits, decoded
+        elif self.sparse_method == "vae":
+            decoded, mu, log_var, masked = self.sparse_model(x)
+            g = self.gnn(masked, edge_index, edge_attr, batch)
             if self.pooling == "concat":
                 _, g = self.mlp(g)
             log_logits = F.log_softmax(g, dim=-1)

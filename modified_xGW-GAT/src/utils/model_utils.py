@@ -5,6 +5,7 @@ from src.models.GATv2 import GATv2
 from src.models.GCN import GCN
 from src.models.MLP import MLP, FC
 from src.models.AE import MaskedAutoencoder, Autoencoder, BaselineMask
+from src.models.VAE import MaskedVariationalAutoencoder
 
 def build_model(args, num_features):
     """Build a classification model, e.g. GATv2, GCN, MLP
@@ -20,7 +21,7 @@ def build_model(args, num_features):
         nn.module: pyGmodel
     """
     print(f"Building model: {args.model_name}")
-    if args.sparse_method in ["mae", "baseline_mask"] and args.model_name == "gcn":
+    if args.sparse_method in ["mae", "baseline_mask", "vae"] and args.model_name == "gcn":
         if args.model_name == "gcn" and args.sparse_method == "mae":
             model = BrainGNN(
                 GCN(num_features, args),
@@ -46,6 +47,20 @@ def build_model(args, num_features):
                 ),
                 args,
                 sparse_model=BaselineMask(num_features),
+            )
+        elif args.model_name == "gcn" and args.sparse_method == "vae":
+            print("Using VAE")
+            model = BrainGNN(
+                GCN(num_features, args),
+                MLP(
+                    args.num_classes,
+                    args.hidden_dim,
+                    args.n_MLP_layers,
+                    torch.nn.ReLU,
+                    n_classes=args.num_classes,
+                ),
+                args,
+                sparse_model=MaskedVariationalAutoencoder(num_features, args.hidden_dim_sparse, args.latent_dim_sparse),
             )
     elif args.model_name == "gatv2":
         model = BrainGNN(

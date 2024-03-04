@@ -47,7 +47,7 @@ class xGW_GAT:
             "--model_name", type=str, default="gatv2", choices=["fc", "gcn", "gatv2"]
         )
         parser.add_argument(
-            "--sparse_method", type=str, default=None, choices=["baseline_mask", "mae", "tf"]
+            "--sparse_method", type=str, default=None, choices=["baseline_mask", "mae", "vae"]
         )
         parser.add_argument("--num_classes", type=int, default=2)
         parser.add_argument(
@@ -82,7 +82,7 @@ class xGW_GAT:
             ],
             help="Chooses the topological measure to be used",
         )
-        parser.add_argument("--epochs", type=int, default=20)
+        parser.add_argument("--epochs", type=int, default=30)
         parser.add_argument("--lr", type=float, default=3e-4)
         parser.add_argument("--weight_decay", type=float, default=2e-2)
         parser.add_argument(
@@ -117,6 +117,7 @@ class xGW_GAT:
         parser.add_argument("--num_heads", type=int, default=2)
         parser.add_argument("--hidden_dim", type=int, default=2)
         parser.add_argument("--hidden_dim_sparse", type=int, default=16)
+        parser.add_argument("--latent_dim_sparse", type=int, default=8)
         parser.add_argument("--edge_emb_dim", type=int, default=1)
         parser.add_argument("--bucket_sz", type=float, default=0.05)
         parser.add_argument("--dropout", type=float, default=0.8)
@@ -125,8 +126,8 @@ class xGW_GAT:
         parser.add_argument("--k_list", type=list, default=[4])
         parser.add_argument("--n_select_splits", type=int, default=2)
         parser.add_argument("--test_interval", type=int, default=1)
-        parser.add_argument("--train_batch_size", type=int, default=2)
-        parser.add_argument("--test_batch_size", type=int, default=2)
+        parser.add_argument("--train_batch_size", type=int, default=4)
+        parser.add_argument("--test_batch_size", type=int, default=4)
         parser.add_argument("--seed", type=int, default=112078)
         parser.add_argument("--diff", type=float, default=0.2)
         parser.add_argument("--mixup", type=int, default=1, choices=[0, 1])
@@ -321,7 +322,7 @@ class xGW_GAT:
                                     test_set = [train_test_dataset[i] for i in test_idx]
                                     print("Length test_set: ", len(test_set))
                                     train_loader = DataLoader(
-                                        train_set, batch_size=args.train_batch_size, shuffle=True
+                                        train_set, batch_size=args.train_batch_size, shuffle=True, drop_last=True
                                     )
                                     test_loader = DataLoader(
                                         test_set, batch_size=args.test_batch_size, shuffle=False, drop_last=True
@@ -413,7 +414,7 @@ class xGW_GAT:
         
         # save the results
         with open(
-            f"./save_results_tuning_gcn_mae.pkl",
+            f"./save_results_tuning_gcn_baseline_masking_vae.pkl",
             "wb",
         ) as f:
             pickle.dump(save_result_tuning, f)
