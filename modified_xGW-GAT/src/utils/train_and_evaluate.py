@@ -163,12 +163,20 @@ def train_eval(
         )
 
         if (i + 1) % args.test_interval == 0:
-            test_acc, test_auc, test_loss, _, _ = test(model, test_loader, args)
-            text = (
-                f"(Test) | Epoch {i}), test_acc={(test_acc * 100):.2f}, "
-                f"test_auc={(test_auc * 100):.2f}\n"
-            )
-            logging.info(text)
+            tests_perc_accs = {}
+            tests_perc_aucs = {}
+            tests_perc_losses = {}
+            for perc in [0, 0.7, 0.8, 0.9, 0.95]:
+                test_acc, test_auc, test_loss, _, _ = test(model, test_loader, args, nulling_out=perc)
+                text = (
+                    f"(Test) {perc} | Epoch {i}), test_acc={(test_acc * 100):.2f}, "
+                    f"test_auc={(test_auc * 100):.2f}\n"
+                )
+                logging.info(text)
+                tests_perc_accs[perc] = test_acc
+                tests_perc_aucs[perc] = test_auc
+                tests_perc_losses[perc] = test_loss
+                
 
         if args.enable_nni:
             nni.report_intermediate_result(train_acc)
@@ -180,9 +188,9 @@ def train_eval(
         train_aucs.append(train_auc)
         train_loss.append(avg_train_loss)
 
-        test_accs.append(test_acc)
-        test_aucs.append(test_auc)
-        test_losses.append(test_loss)
+        test_accs.append(tests_perc_accs)
+        test_aucs.append(tests_perc_aucs)
+        test_losses.append(tests_perc_losses)
 
         save_best_model(avg_train_loss, i, model, optimizer, criterion, args)
 
@@ -191,7 +199,7 @@ def train_eval(
 
 
 @torch.no_grad()
-def test(model, loader, args, test_loader=None):
+def test(model, loader, args, test_loader=None, nulling_out=None):
     """
     Test model
     """
@@ -210,50 +218,96 @@ def test(model, loader, args, test_loader=None):
         data = data.to(args.device)
 
         if args.sparse_method == "mae":
-            gcn_output, decoded = model(data)
-            pred = gcn_output.max(dim=1)[1]
-            reconstruction_loss = mse_loss(decoded, data.x)  # Autoencoder loss
             if args.model_name == "fc":
                     mask = model.mask
             else:
                 mask = model.sparse_model.mask
-            classification_loss = nn.NLLLoss()(gcn_output, data.y)
-            total_loss = classification_loss + reconstruction_loss + 0.01 * torch.linalg.norm(mask) # Frobenius norm
-            #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(torch.abs(mask))  # L1 regularization
-            #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(mask ** 2)  # L2 regularization (squared)
-            #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.linalg.norm(mask, 1) + 0.01 * torch.linalg.norm(mask, 2) # Elastic Net
-            #total_loss = classification_loss + reconstruction_loss + 0.01 * k_support_norm(mask, 5) # K-support norm
-            #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(x**2 * (1 - x**2)) # Forcing to 1 or 0 values
+            if nulling_out:
+                data.x = data.x * mask
+                threshold = torch.quantile(np.abs(data.x.view(-1)), nulling_out)
+                data.x = data.x * (np.abs(data.x) >= threshold)
+                gcn_output, decoded = model(data)
+                pred = gcn_output.max(dim=1)[1]
+                reconstruction_loss = mse_loss(decoded, data.x)  # Autoencoder loss
+                classification_loss = nn.NLLLoss()(gcn_output, data.y)
+                total_loss = classification_loss + reconstruction_loss + 0.01 * torch.linalg.norm(mask) # Frobenius norm
+                #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(torch.abs(mask))  # L1 regularization
+                #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(mask ** 2)  # L2 regularization (squared)
+                #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.linalg.norm(mask, 1) + 0.01 * torch.linalg.norm(mask, 2) # Elastic Net
+                #total_loss = classification_loss + reconstruction_loss + 0.01 * k_support_norm(mask, 5) # K-support norm
+                #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(x**2 * (1 - x**2)) # Forcing to 1 or 0 values
+            else:
+                gcn_output, decoded = model(data)
+                pred = gcn_output.max(dim=1)[1]
+                reconstruction_loss = mse_loss(decoded, data.x)  # Autoencoder loss
+                classification_loss = nn.NLLLoss()(gcn_output, data.y)
+                total_loss = classification_loss + reconstruction_loss + 0.01 * torch.linalg.norm(mask) # Frobenius norm
+                #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(torch.abs(mask))  # L1 regularization
+                #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(mask ** 2)  # L2 regularization (squared)
+                #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.linalg.norm(mask, 1) + 0.01 * torch.linalg.norm(mask, 2) # Elastic Net
+                #total_loss = classification_loss + reconstruction_loss + 0.01 * k_support_norm(mask, 5) # K-support norm
+                #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(x**2 * (1 - x**2)) # Forcing to 1 or 0 values
         elif args.sparse_method == "baseline_mask":
-            gcn_output, masked = model(data)
-            pred = gcn_output.max(dim=1)[1]
             if args.model_name == "fc":
                     mask = model.mask
             else:
                 mask = model.sparse_model.mask
-            classification_loss = nn.NLLLoss()(gcn_output, data.y)
-            total_loss = classification_loss + 0.01 * torch.linalg.norm(mask) # Frobenius norm
-            #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(torch.abs(mask))  # L1 regularization
-            #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(mask ** 2)  # L2 regularization (squared)
-            #total_loss = classification_loss + 0.01 * torch.linalg.norm(mask, 1) + 0.01 * torch.linalg.norm(mask, 2) # Elastic Net
-            #total_loss = classification_loss + 0.01 * k_support_norm(mask, 5) # K-support norm
-            #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(x**2 * (1 - x**2)) # Forcing to 1 or 0 values
+            if nulling_out:
+                data.x = data.x * mask
+                threshold = torch.quantile(np.abs(data.x.view(-1)), nulling_out)
+                data.x = data.x * (np.abs(data.x) >= threshold)
+                gcn_output, masked = model(data)
+                pred = gcn_output.max(dim=1)[1]
+                classification_loss = nn.NLLLoss()(gcn_output, data.y)
+                total_loss = classification_loss + 0.01 * torch.linalg.norm(mask)
+                #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(torch.abs(mask))  # L1 regularization
+                #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(mask ** 2)  # L2 regularization (squared)
+                #total_loss = classification_loss + 0.01 * torch.linalg.norm(mask, 1) + 0.01 * torch.linalg.norm(mask, 2) # Elastic Net
+                #total_loss = classification_loss + 0.01 * k_support_norm(mask, 5) # K-support norm
+                #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(x**2 * (1 - x**2)) # Forcing to 1 or 0 values
+
+            else:
+                gcn_output, masked = model(data)
+                pred = gcn_output.max(dim=1)[1]
+                classification_loss = nn.NLLLoss()(gcn_output, data.y)
+                total_loss = classification_loss + 0.01 * torch.linalg.norm(mask) # Frobenius norm
+                #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(torch.abs(mask))  # L1 regularization
+                #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(mask ** 2)  # L2 regularization (squared)
+                #total_loss = classification_loss + 0.01 * torch.linalg.norm(mask, 1) + 0.01 * torch.linalg.norm(mask, 2) # Elastic Net
+                #total_loss = classification_loss + 0.01 * k_support_norm(mask, 5) # K-support norm
+                #total_loss = classification_loss + reconstruction_loss + 0.01 * torch.sum(x**2 * (1 - x**2)) # Forcing to 1 or 0 values
         elif args.sparse_method == "vae":
-            gcn_output, decoded = model(data)
-            pred = gcn_output.max(dim=1)[1]
-            reconstruction_loss = mse_loss(decoded, data.x)  # Autoencoder loss
             if args.model_name == "fc":
                     mask = model.mask
             else:
                 mask = model.sparse_model.mask
-            classification_loss = nn.NLLLoss()(gcn_output, data.y)
-            kl_divergence = -0.5 * torch.sum(1 + model.sparse_model.log_var - model.sparse_model.mu.pow(2) - model.sparse_model.log_var.exp())
-            #total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * torch.linalg.norm(mask) # Frobenius norm
-            #total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * torch.sum(torch.abs(mask))  # L1 regularization 
-            #total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * torch.sum(mask ** 2)  # L2 regularization (squared)
-            total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * (torch.sum(torch.abs(mask)) + args.weights_elastic * torch.sum(mask ** 2)) # Elastic Net
-            #total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * k_support_norm(mask, 5) # K-support norm
-            #total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * torch.sum(mask**2 * (1 - mask**2)) # Forcing to 1 or 0 values
+            if nulling_out:
+                data.x = data.x * mask
+                threshold = torch.quantile(np.abs(data.x.view(-1)), nulling_out)
+                data.x = data.x * (np.abs(data.x) >= threshold)
+                gcn_output, decoded = model(data)
+                pred = gcn_output.max(dim=1)[1]
+                reconstruction_loss = mse_loss(decoded, data.x)  # Autoencoder loss
+                classification_loss = nn.NLLLoss()(gcn_output, data.y)
+                kl_divergence = -0.5 * torch.sum(1 + model.sparse_model.log_var - model.sparse_model.mu.pow(2) - model.sparse_model.log_var.exp())
+                #total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * torch.linalg.norm(mask) # Frobenius norm
+                #total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * torch.sum(torch.abs(mask))  # L1 regularization 
+                #total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * torch.sum(mask ** 2)  # L2 regularization (squared)
+                total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * (torch.sum(torch.abs(mask)) + args.weights_elastic * torch.sum(mask ** 2)) # Elastic Net
+                #total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * k_support_norm(mask, 5) # K-support norm
+                #total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * torch.sum(mask**2 * (1 - mask**2)) # Forcing to 1 or 0 values
+            else:
+                gcn_output, decoded = model(data)
+                pred = gcn_output.max(dim=1)[1]
+                reconstruction_loss = mse_loss(decoded, data.x)  # Autoencoder loss
+                classification_loss = nn.NLLLoss()(gcn_output, data.y)
+                kl_divergence = -0.5 * torch.sum(1 + model.sparse_model.log_var - model.sparse_model.mu.pow(2) - model.sparse_model.log_var.exp())
+                #total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * torch.linalg.norm(mask) # Frobenius norm
+                #total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * torch.sum(torch.abs(mask))  # L1 regularization 
+                #total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * torch.sum(mask ** 2)  # L2 regularization (squared)
+                total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * (torch.sum(torch.abs(mask)) + args.weights_elastic * torch.sum(mask ** 2)) # Elastic Net
+                #total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * k_support_norm(mask, 5) # K-support norm
+                #total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * torch.sum(mask**2 * (1 - mask**2)) # Forcing to 1 or 0 values
         else:
             out = model(data)
             pred = out.max(dim=1)[1]

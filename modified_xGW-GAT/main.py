@@ -82,7 +82,7 @@ class xGW_GAT:
             ],
             help="Chooses the topological measure to be used",
         )
-        parser.add_argument("--epochs", type=int, default=30)
+        parser.add_argument("--epochs", type=int, default=20)
         parser.add_argument("--lr", type=float, default=3e-4)
         parser.add_argument("--weight_decay", type=float, default=2e-2)
         parser.add_argument(
@@ -130,7 +130,7 @@ class xGW_GAT:
         parser.add_argument("--n_select_splits", type=int, default=2)
         parser.add_argument("--test_interval", type=int, default=1)
         parser.add_argument("--train_batch_size", type=int, default=2)
-        parser.add_argument("--test_batch_size", type=int, default=2)
+        parser.add_argument("--test_batch_size", type=int, default=1)
         parser.add_argument("--seed", type=int, default=112078)
         parser.add_argument("--diff", type=float, default=0.2)
         parser.add_argument("--mixup", type=int, default=1, choices=[0, 1])
@@ -264,8 +264,8 @@ class xGW_GAT:
         hidden_dim_values = [4]
         dropout_values = [0.5]
         loss_lambda_values = [10]
-        weights_lambda_values = [0.1, 1, 10]
-        weights_elastic_values = [0.2, 0.5, 1]
+        weights_lambda_values = [10]
+        weights_elastic_values = [0.5]
 
         save_result_tuning = {}
 
@@ -284,8 +284,9 @@ class xGW_GAT:
                             for weights_lambda in weights_lambda_values:
                                 args.weights_lambda = weights_lambda
                                 for weights_elastic in weights_elastic_values:
+                                    args.weights_elastic = weights_elastic
                                     print(f"MLP_layers: {MLP_layers}, GNN_layers: {GNN_layers}, num_heads: {num_heads}, hidden_dim: {hidden_dim}, dropout: {dropout}")
-                                    save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout, loss_lambda, weights_lambda)] = []
+                                    save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout, loss_lambda, weights_lambda, weights_elastic)] = []
                                     fold = -1
                                     for train_idx, test_idx in KFold(
                                         args.k_fold_splits,
@@ -375,14 +376,25 @@ class xGW_GAT:
                                             test_aucs[fold] = test_auc
                                             test_losses[fold] = test_loss
 
-                                            test_acc, test_auc, _, t_preds, t_labels = test(model, test_loader, args)
+
+                                            tests_perc_accs = {}
+                                            tests_perc_aucs = {}
+                                            tests_perc_losses = {}
+                                            test_perc_preds = {}
+                                            test_perc_labels = {}
+                                            for perc in [0, 0.7, 0.8, 0.9, 0.95]:
+                                                test_acc, test_auc, _, t_preds, t_labels = test(model, test_loader, args, nulling_out=perc)
+                                                tests_perc_accs[perc] = test_acc
+                                                tests_perc_aucs[perc] = test_auc
+                                                test_perc_preds[perc] = t_preds
+                                                test_perc_labels[perc] = t_labels
 
                                             preds_all[fold] = t_preds
                                             labels_all[fold] = t_labels
 
                                             logging.info(
-                                                f"(Performance Last Epoch) | test_acc={(test_acc * 100):.2f}, "
-                                                + f"test_auc={(test_auc * 100):.2f}"
+                                                f"(Performance Last Epoch) | test_acc={(np.max(list(tests_perc_accs.values())) * 100):.2f}, "
+                                                + f"test_auc={(np.max(list(tests_perc_aucs.values())) * 100):.2f}"
                                             )
 
                                             if args.explain:
@@ -400,32 +412,51 @@ class xGW_GAT:
                                         )
 
                                     # get the max accs and aucs for each fold
-                                    max_test_accs = {k: max(v) for k, v in test_accs.items()}
-                                    max_test_aucs = {k: max(v) for k, v in test_aucs.items()}
+                                    print(test_accs)
+                                    print(test_aucs)
+                                    print(test_accs.items())
+                                    max_test_accs = {fold: {perc: max(iteration[perc] for iteration in iterations) for perc in iterations[0]} for fold, iterations in test_accs.items()}
+                                    max_test_aucs = {fold: {perc: max(iteration[perc] for iteration in iterations) for perc in iterations[0]} for fold, iterations in test_aucs.items()}
+                                    print(max_test_accs)
+                                    result_str = "(K Fold Final Result)| "
 
-                                    result_str = (
-                                        f"(K Fold Final Result)| avg_acc={(np.mean(list(max_test_accs.values())) * 100):.2f} +- {(np.std(list(max_test_accs.values())) * 100):.2f}, "
-                                        f"avg_auc={(np.mean(list(max_test_aucs.values())) * 100):.2f} +- {np.std(list(max_test_aucs.values())) * 100:.2f}, "
-                                        f"max_acc={(np.max(list(max_test_accs.values())) * 100):.2f}, "
-                                        f"max_auc={(np.max(list(max_test_aucs.values())) * 100):.2f}\n"
-                                    )
+                                    # Get all unique percentages
+                                    percentages = set(perc for fold_results in max_test_accs.values() for perc in fold_results)
+
+                                    # Iterate over each percentage
+                                    for perc in percentages:
+                                        accs_at_perc = [fold_results[perc] for fold_results in max_test_accs.values()]
+                                        aucs_at_perc = [fold_results[perc] for fold_results in max_test_aucs.values()]
+
+                                        avg_acc = np.mean(accs_at_perc) * 100
+                                        std_acc = np.std(accs_at_perc) * 100
+                                        avg_auc = np.mean(aucs_at_perc) * 100
+                                        std_auc = np.std(aucs_at_perc) * 100
+
+                                        result_str += f"perc {perc}: avg_acc={avg_acc:.2f} +- {std_acc:.2f}, avg_auc={avg_auc:.2f} +- {std_auc:.2f}, "
+
+                                    # Add maximum average acc and maximum auc across all percentages
+                                    max_avg_acc = np.max([np.mean([fold_results[perc] for fold_results in max_test_accs.values()]) for perc in percentages]) * 100
+                                    max_avg_auc = np.max([np.mean([fold_results[perc] for fold_results in max_test_aucs.values()]) for perc in percentages]) * 100
+
+                                    result_str += f"max_avg_acc={max_avg_acc:.2f}, max_avg_auc={max_avg_auc:.2f}\n"
                                     logging.info(result_str)
-                                    save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout, loss_lambda, weights_lambda)].append(result_str)
-
-                                    print("====================================")
-                                    print("Testing for Treatment group:")
-                                    test_acc, test_auc, _, _, _ = test(model, test_treatment_loader, args)
-                                    print(f"Test acc: {test_acc}, Test auc: {test_auc}")
-                                    save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout, loss_lambda, weights_lambda)].append(f"For Treatment group: (Test acc: {test_acc}, Test auc: {test_auc})")
-                                    print("====================================")
-                                    print("Testing for Scanner group:")
-                                    test_acc, test_auc, _, _, _ = test(model, test_scanner_loader, args)
-                                    print(f"Test acc: {test_acc}, Test auc: {test_auc}")
-                                    save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout, loss_lambda, weights_lambda)].append(f"For Scanner group: (Test acc: {test_acc}, Test auc: {test_auc})")
+                                    save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout, loss_lambda, weights_lambda, weights_elastic)].append(result_str)
+                                    for perc in percentages:
+                                        print("====================================")
+                                        print("Testing for Treatment group perc: ", perc)
+                                        test_acc, test_auc, _, _, _ = test(model, test_treatment_loader, args, nulling_out=perc)
+                                        print(f"Test acc: {test_acc}, Test auc: {test_auc}")
+                                        save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout, loss_lambda, weights_lambda, weights_elastic)].append(f"For Treatment group perc {perc}: (Test acc: {test_acc}, Test auc: {test_auc})")
+                                        print("====================================")
+                                        print("Testing for Scanner group perc: ", perc)
+                                        test_acc, test_auc, _, _, _ = test(model, test_scanner_loader, args, nulling_out=perc)
+                                        print(f"Test acc: {test_acc}, Test auc: {test_auc}")
+                                        save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout, loss_lambda, weights_lambda, weights_elastic)].append(f"For Scanner group perc {perc}: (Test acc: {test_acc}, Test auc: {test_auc})")
         
         # save the results
         with open(
-            f"./save_results_tuning_gcn_baseline_masking_vae_weights_elastic.pkl",
+            f"./save_results_tuning_gcn_baseline_masking_vae_weights_elastic_nullingout.pkl",
             "wb",
         ) as f:
             pickle.dump(save_result_tuning, f)
