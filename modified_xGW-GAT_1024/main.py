@@ -232,17 +232,17 @@ class xGW_GAT:
 
 
 
-        controls_indices = [idx for idx in controls_indices if idx < len(dataset)]
-        test_treatment = dataset[[idx for idx in range(len(dataset)) if idx not in controls_indices]]
-        dataset = dataset[controls_indices]
-        dataset = dataset[[idx for idx in range(len(dataset)) if idx not in scanner_indices]]
-
-        test_treatment_loader = DataLoader(
-                    test_treatment, batch_size=args.test_batch_size, shuffle=False, drop_last=True
-                )
         test_scanner = dataset[[idx for idx in range(len(dataset)) if idx in scanner_indices]]
         test_scanner_loader = DataLoader(
                     test_scanner, batch_size=args.test_batch_size, shuffle=False, drop_last=True
+                )
+        print(len(scanner_indices))
+        controls_indices = [idx for idx in controls_indices if idx < len(dataset)]
+        test_treatment = dataset[[idx for idx in range(len(dataset)) if idx not in controls_indices]]
+        dataset = dataset[[idx for idx in range(len(dataset)) if idx not in scanner_indices and idx not in controls_indices]]
+
+        test_treatment_loader = DataLoader(
+                    test_treatment, batch_size=args.test_batch_size, shuffle=False, drop_last=True
                 )
         
         shuffled_indices = torch.randperm(len(dataset))
@@ -470,7 +470,7 @@ class xGW_GAT:
         
         # save the results
         with open(
-            f"./save_results_tuning_1024_sparef_gcn_baseline_masking_vae_weights_elastic_nullingout.pkl",
+            f"./save_results_tuning_1024_gcn_baseline_masking_vae_weights_elastic_nullingout.pkl",
             "wb",
         ) as f:
             pickle.dump(save_result_tuning, f)

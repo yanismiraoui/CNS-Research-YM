@@ -83,7 +83,7 @@ class xGW_GAT:
             help="Chooses the topological measure to be used",
         )
         parser.add_argument("--epochs", type=int, default=20)
-        parser.add_argument("--lr", type=float, default=3e-4)
+        parser.add_argument("--lr", type=float, default=1e-4)
         parser.add_argument("--weight_decay", type=float, default=2e-2)
         parser.add_argument(
             "--gcn_mp_type",
@@ -156,7 +156,6 @@ class xGW_GAT:
             controls_indices = pickle.load(f)
         with open(f"{args.data_folder}idx_sites_ood.pkl", "rb") as f:
             scanner_indices = pickle.load(f)
-        print(len(scanner_indices))
         
         args.num_nodes = dataset.num_nodes
         args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -232,18 +231,17 @@ class xGW_GAT:
                     pickle.dump(score_dict, s_d)
 
 
-
-        controls_indices = [idx for idx in controls_indices if idx < len(dataset)]
-        #test_treatment = dataset[[idx for idx in range(len(dataset)) if idx not in controls_indices]]
-        dataset = dataset[controls_indices]
-        dataset = dataset[[idx for idx in range(len(dataset)) if idx not in scanner_indices]]
-
-        #test_treatment_loader = DataLoader(
-        #            test_treatment, batch_size=args.test_batch_size, shuffle=False, drop_last=True
-        #        )
         test_scanner = dataset[[idx for idx in range(len(dataset)) if idx in scanner_indices]]
         test_scanner_loader = DataLoader(
                     test_scanner, batch_size=args.test_batch_size, shuffle=False, drop_last=True
+                )
+        print(len(scanner_indices))
+        controls_indices = [idx for idx in controls_indices if idx < len(dataset)]
+        test_treatment = dataset[[idx for idx in range(len(dataset)) if idx not in controls_indices]]
+        dataset = dataset[[idx for idx in range(len(dataset)) if idx not in scanner_indices and idx not in controls_indices]]
+
+        test_treatment_loader = DataLoader(
+                    test_treatment, batch_size=args.test_batch_size, shuffle=False, drop_last=True
                 )
         
         shuffled_indices = torch.randperm(len(dataset))
@@ -448,11 +446,11 @@ class xGW_GAT:
                                     logging.info(result_str)
                                     save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout, loss_lambda, weights_lambda, weights_elastic)].append(result_str)
                                     for perc in percentages:
-                                        #print("====================================")
-                                        #print("Testing for Treatment group perc: ", perc)
-                                        #test_acc, test_auc, _, _, _ = test(model, test_treatment_loader, args, nulling_out=perc)
-                                        #print(f"Test acc: {test_acc}, Test auc: {test_auc}")
-                                        #save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout, loss_lambda, weights_lambda, weights_elastic)].append(f"For Treatment group perc {perc}: (Test acc: {test_acc}, Test auc: {test_auc})")
+                                        print("====================================")
+                                        print("Testing for Treatment group perc: ", perc)
+                                        test_acc, test_auc, _, _, _ = test(model, test_treatment_loader, args, nulling_out=perc)
+                                        print(f"Test acc: {test_acc}, Test auc: {test_auc}")
+                                        save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout, loss_lambda, weights_lambda, weights_elastic)].append(f"For Treatment group perc {perc}: (Test acc: {test_acc}, Test auc: {test_auc})")
                                         print("====================================")
                                         print("Testing for Scanner group perc: ", perc)
                                         test_acc, test_auc, _, _, _ = test(model, test_scanner_loader, args, nulling_out=perc)
@@ -461,7 +459,7 @@ class xGW_GAT:
         
         # save the results
         with open(
-            f"./save_results_tuning_gcn_baseline_masking_mae_weights_elastic_nullingout.pkl",
+            f"./save_results_tuning_gcn.pkl",
             "wb",
         ) as f:
             pickle.dump(save_result_tuning, f)
