@@ -31,6 +31,7 @@ def train_eval(
     train_preds, train_labels, train_aucs, train_accs, train_loss, test_accs, test_aucs, test_losses = [], [], [], [], [], [], [], []
     total_correct = 0
     total_samples = 0
+    latent_space_features = []
     print("Starting training...")
     for i in range(args.epochs):
         running_loss = 0  # running loss for logging
@@ -125,6 +126,8 @@ def train_eval(
                 #total_loss = classification_loss + args.loss_lambda*(reconstruction_loss + 0.1*kl_divergence) + args.weights_lambda * torch.sum(mask**2 * (1 - mask**2)) # Forcing to 1 or 0 values
                 total_loss.backward()
                 optimizer.step()
+                if i == args.epochs - 1:
+                    latent_space_features.append(model.sparse_model.mu)
                 running_loss += float(total_loss.item())
 
             elif args.sparse_method == "baseline_mask":
@@ -166,6 +169,9 @@ def train_eval(
                 optimizer.step()
                 running_loss += float(loss.item())
 
+        
+        
+
         avg_train_loss = running_loss / len(
             train_loader.dataset
         )  # Correctly calculate loss per epoch
@@ -184,7 +190,7 @@ def train_eval(
             tests_perc_aucs = {}
             tests_perc_losses = {}
             best_perc = 0
-            for perc in [0, 0.7, 0.8, 0.9, 0.95]:
+            for perc in [0, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99]:
                 test_acc, test_auc, test_loss, _, _ = test(model, test_loader, args, nulling_out=perc)
                 text = (
                     f"(Test) {perc} | Epoch {i+1}), test_acc={(test_acc * 100):.2f}, "
@@ -214,6 +220,8 @@ def train_eval(
         save_best_model(avg_train_loss, i, model, optimizer, criterion, args)
 
     train_accs, train_aucs = np.array(train_accs), np.array(train_aucs)
+    with open(f"./latent_features.pkl","wb") as f:
+        pickle.dump(latent_space_features, f)
     return train_accs, train_aucs, train_loss, test_accs, test_aucs, test_losses, model
 
 
@@ -232,7 +240,7 @@ def test(model, loader, args, test_loader=None, nulling_out=None):
     mse_loss = nn.MSELoss()
     if args.sparse_method == "mae":
         print("Testing model using sparse method")
-
+    l = 0
     for data in loader:
         data = data.to(args.device)
 
@@ -301,9 +309,18 @@ def test(model, loader, args, test_loader=None, nulling_out=None):
             else:
                 mask = model.sparse_model.mask
             if nulling_out:
+                # save first matrix before nulling out
+                if l == 0:
+                    with open(f"./corr_matrix_before_{nulling_out}.pkl","wb") as f:
+                        pickle.dump(data.x, f)
                 data.x = data.x * mask
                 threshold = torch.quantile(np.abs(data.x.view(-1)), nulling_out)
                 data.x = data.x * (np.abs(data.x) >= threshold)
+                # save one matrix before and after nulling out
+                if l == 0:
+                    with open(f"./corr_matrix_after_{nulling_out}.pkl","wb") as f:
+                        pickle.dump(data.x, f)
+                    l += 1
                 gcn_output, decoded = model(data)
                 pred = gcn_output.max(dim=1)[1]
                 reconstruction_loss = mse_loss(decoded, data.x)  # Autoencoder loss
@@ -354,11 +371,12 @@ def test(model, loader, args, test_loader=None, nulling_out=None):
 
     if test_loader is not None:
         _, test_auc, preds, labels = test(model, test_loader, args)
-        test_acc = np.mean(np.array(preds) == np.array(labels))
-
+        #test_acc = np.mean(np.array(preds) == np.array(labels))
+        test_acc = metrics.balanced_accuracy_score(labels, preds)
         return test_auc, test_acc
     else:
         t_acc = np.mean(np.array(preds) == np.array(labels))
+        #t_acc = metrics.balanced_accuracy_score(labels, preds)
         return t_acc, t_auc, avg_test_loss, preds, labels
 
 @torch.no_grad()

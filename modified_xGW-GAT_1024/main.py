@@ -125,7 +125,7 @@ class xGW_GAT:
         parser.add_argument("--bucket_sz", type=float, default=0.05)
         parser.add_argument("--dropout", type=float, default=0.8)
         parser.add_argument("--repeat", type=int, default=1)
-        parser.add_argument("--k_fold_splits", type=int, default=5)
+        parser.add_argument("--k_fold_splits", type=int, default=2)
         parser.add_argument("--k_list", type=list, default=[4])
         parser.add_argument("--n_select_splits", type=int, default=2)
         parser.add_argument("--test_interval", type=int, default=1)
@@ -397,7 +397,7 @@ class xGW_GAT:
                                                 if test_acc > tests_perc_accs[best_perc]:
                                                     best_perc = perc
                                             
-                                            masks_dict[fold] = get_masks_best_binarization(test_loader, model, best_perc, args)
+                                            #masks_dict[fold] = get_masks_best_binarization(test_loader, model, best_perc, args)
                                             preds_all[fold] = t_preds
                                             labels_all[fold] = t_labels
 
@@ -463,6 +463,57 @@ class xGW_GAT:
                                         print(f"Test acc: {test_acc}, Test auc: {test_auc}")
                                         save_result_tuning[(MLP_layers, GNN_layers, num_heads, hidden_dim, dropout, loss_lambda, weights_lambda, weights_elastic)].append(f"For Scanner group perc {perc}: (Test acc: {test_acc}, Test auc: {test_auc})")
 
+                                    dataset_loader = DataLoader(
+                                        dataset, batch_size=args.test_batch_size, shuffle=False, drop_last=True
+                                    )
+                                    if args.sparse_method == "vae":
+                                        model.eval()
+                                        # get latent features of VAE for ID, Scanner, and treatment group
+                                        print("====================================")
+                                        print("Getting latent features for ID group")
+                                        latent_features_id = []
+                                        for data in dataset_loader:
+                                            data = data.to(args.device)
+                                            mask = model.sparse_model.mask
+                                            data.x = data.x * mask
+                                            threshold = torch.quantile(torch.abs(data.x.view(-1).detach()), 0.9)
+                                            data.x = data.x * (torch.abs(data.x) >= threshold)
+                                            _, _ = model(data)
+                                            latent_features_id.append(model.sparse_model.mu)
+                                        # save latent features for ID group
+                                        with open( f"./latent_features_id.pkl","wb",) as f:
+                                            pickle.dump(latent_features_id, f)
+                                        print("====================================")
+                                        print("Getting latent features for Scanner group")
+                                        latent_features_scanner = []
+                                        for data in test_scanner_loader:
+                                            data = data.to(args.device)
+                                            mask = model.sparse_model.mask
+                                            data.x = data.x * mask
+                                            threshold = torch.quantile(torch.abs(data.x.view(-1).detach()), 0.9)
+                                            data.x = data.x * (torch.abs(data.x) >= threshold)
+                                            _, _ = model(data)
+                                            latent_features_scanner.append(model.sparse_model.mu)
+                                        # save latent features for Scanner group
+                                        with open( f"./latent_features_scanner.pkl","wb",) as f:
+                                            pickle.dump(latent_features_scanner, f)
+                                        print("====================================")
+                                        print("Getting latent features for Treatment group")
+                                        latent_features_treatment = []
+                                        for data in test_treatment_loader:
+                                            data = data.to(args.device)
+                                            mask = model.sparse_model.mask
+                                            data.x = data.x * mask
+                                            threshold = torch.quantile(torch.abs(data.x.view(-1).detach()), 0.9)
+                                            data.x = data.x * (torch.abs(data.x) >= threshold)
+                                            _, _ = model(data)
+                                            latent_features_treatment.append(model.sparse_model.mu)
+                                        # save latent features for Treatment group
+                                        with open( f"./latent_features_treatment.pkl","wb",) as f:
+                                            pickle.dump(latent_features_treatment, f)
+                                            
+
+
                                     # compute similarity between masks
                                     similarity_masks = compute_similarity_masks(masks_dict, args)
                                     print("Similarity between masks: ", similarity_masks)
@@ -470,7 +521,7 @@ class xGW_GAT:
         
         # save the results
         with open(
-            f"./save_results_tuning_1024_gcn_baseline_masking_vae_weights_elastic_nullingout.pkl",
+            f"./save_results_tuning_1024_sparef_gcn_baseline_masking_vae_weights_elastic_nullingout.pkl",
             "wb",
         ) as f:
             pickle.dump(save_result_tuning, f)
